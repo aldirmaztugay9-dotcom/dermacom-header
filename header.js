@@ -252,32 +252,27 @@
   wrapper.innerHTML = html;
   document.body.insertBefore(wrapper, document.body.firstChild);
 
-  // Hide Framer's native navigation
+  // Aggressively hide Framer's native header using MutationObserver
   const hideFramerNav = () => {
-    // Try multiple selectors Framer uses for its nav
-    const selectors = [
-      '[data-framer-name="Navigation"]',
-      '[class*="framer-"][role="navigation"]',
-      'nav[class*="framer"]',
-      '[data-framer-component-type="NavigationComponent"]',
-      '[class*="navigation"]',
-    ];
-    selectors.forEach(sel => {
-      document.querySelectorAll(sel).forEach(el => {
-        // Only hide if it's NOT our header
-        if (!el.closest('#dc-header') && !el.id?.startsWith('dc-')) {
-          el.style.setProperty('display', 'none', 'important');
-        }
-      });
-    });
-    // Also look for fixed/sticky positioned elements at top that aren't ours
-    document.querySelectorAll('body > *:not(#dc-header):not(#dc-usps):not(#dc-mobile-menu):not(script):not(style)').forEach(el => {
-      if (el.id && el.id.startsWith('dc-')) return;
-      const style = window.getComputedStyle(el);
-      if ((style.position === 'fixed' || style.position === 'sticky') && style.top === '0px' && parseInt(style.zIndex) < 9999) {
-        el.style.setProperty('visibility', 'hidden', 'important');
-        el.style.setProperty('pointer-events', 'none', 'important');
+    document.querySelectorAll('body > *').forEach(el => {
+      if (el.id && (el.id === 'dc-header' || el.id === 'dc-usps' || el.id === 'dc-mobile-menu')) return;
+      if (el.tagName === 'SCRIPT' || el.tagName === 'STYLE' || el.tagName === 'NOSCRIPT') return;
+      // Check if it looks like a fixed header at top
+      const cs = window.getComputedStyle(el);
+      const rect = el.getBoundingClientRect();
+      if (
+        (cs.position === 'fixed' || cs.position === 'sticky') &&
+        rect.top <= 10 &&
+        rect.height < 200 &&
+        parseInt(cs.zIndex || 0) < 9999
+      ) {
+        el.style.setProperty('display', 'none', 'important');
       }
+    });
+    // Also hide by common Framer nav patterns
+    const dcIds = ['dc-header','dc-usps','dc-mobile-menu'];
+    document.querySelectorAll('[class*="framer"] nav, [class*="framer"] header, nav[class*="framer"], header[class*="framer"]').forEach(el => {
+      if (!dcIds.includes(el.id)) el.style.setProperty('display', 'none', 'important');
     });
   };
 
@@ -289,9 +284,13 @@
   const init = () => {
     pushBody();
     hideFramerNav();
-    // Re-run after a delay in case Framer renders async
-    setTimeout(hideFramerNav, 500);
-    setTimeout(hideFramerNav, 1500);
+    setTimeout(hideFramerNav, 300);
+    setTimeout(hideFramerNav, 800);
+    setTimeout(hideFramerNav, 2000);
+    // MutationObserver to catch async Framer renders
+    const obs = new MutationObserver(() => hideFramerNav());
+    obs.observe(document.body, { childList: true, subtree: false });
+    setTimeout(() => obs.disconnect(), 5000);
   };
 
   if (document.readyState === 'loading') {
