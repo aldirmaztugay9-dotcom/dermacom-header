@@ -252,14 +252,52 @@
   wrapper.innerHTML = html;
   document.body.insertBefore(wrapper, document.body.firstChild);
 
+  // Hide Framer's native navigation
+  const hideFramerNav = () => {
+    // Try multiple selectors Framer uses for its nav
+    const selectors = [
+      '[data-framer-name="Navigation"]',
+      '[class*="framer-"][role="navigation"]',
+      'nav[class*="framer"]',
+      '[data-framer-component-type="NavigationComponent"]',
+      '[class*="navigation"]',
+    ];
+    selectors.forEach(sel => {
+      document.querySelectorAll(sel).forEach(el => {
+        // Only hide if it's NOT our header
+        if (!el.closest('#dc-header') && !el.id?.startsWith('dc-')) {
+          el.style.setProperty('display', 'none', 'important');
+        }
+      });
+    });
+    // Also look for fixed/sticky positioned elements at top that aren't ours
+    document.querySelectorAll('body > *:not(#dc-header):not(#dc-usps):not(#dc-mobile-menu):not(script):not(style)').forEach(el => {
+      if (el.id && el.id.startsWith('dc-')) return;
+      const style = window.getComputedStyle(el);
+      if ((style.position === 'fixed' || style.position === 'sticky') && style.top === '0px' && parseInt(style.zIndex) < 9999) {
+        el.style.setProperty('visibility', 'hidden', 'important');
+        el.style.setProperty('pointer-events', 'none', 'important');
+      }
+    });
+  };
+
   // Push body down
   const pushBody = () => {
     document.body.style.paddingTop = '104px';
   };
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', pushBody);
-  } else {
+
+  const init = () => {
     pushBody();
+    hideFramerNav();
+    // Re-run after a delay in case Framer renders async
+    setTimeout(hideFramerNav, 500);
+    setTimeout(hideFramerNav, 1500);
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
   }
 
   // Dropdown logic
